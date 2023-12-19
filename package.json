@@ -14,6 +14,7 @@
     "webpack-cli": "^4.10.0"
   },
   "dependencies": {
+    "js-interpreter": "^5.1.0",
     "sef": "file:sef"
   }
 }

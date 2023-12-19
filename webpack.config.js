@@ -7,8 +7,8 @@ module.exports = {
   entry: "./src/index.ts",
   output: {
     path: path.resolve(__dirname, 'build/'),
-    filename: "games.js", // <--- Will be compiled to this single file
-    library: "SnapGames",
+    filename: "snap-js.js", // <--- Will be compiled to this single file
+    library: "SnapJS",
   },
   resolve: {
     extensions: [".ts", ".tsx", ".js"],
