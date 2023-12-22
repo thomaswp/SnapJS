@@ -12,6 +12,7 @@ module.exports = {
   },
   resolve: {
     extensions: [".ts", ".tsx", ".js"],
+    fallback: { "vm": false },
   },
   module: {
     rules: [

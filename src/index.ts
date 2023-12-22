@@ -1,5 +1,6 @@
 import { Extension } from "sef";
 import { JSThreadManager } from "./Interpreter";
+import { createBlocks } from "./blocks";
 
 export class SnapJSExtension extends Extension {
 
@@ -9,6 +10,9 @@ export class SnapJSExtension extends Extension {
         window["interp"] = interpreter;
         interpreter.init();
         interpreter.test();
+
+        createBlocks(this.blocks);
+        this.blocks.refresh();
     }
 }
 

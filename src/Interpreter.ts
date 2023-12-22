@@ -11,6 +11,7 @@ export class JSThread {
     receiver: SpriteMorph | StageMorph;
     get stopped() { return this.interpreter.getStatus() == Interpreter.Status.DONE; }
     lastRunNode;
+    get result() { return this.interpreter.value; }
 
     constructor(code: string, receiver: SpriteMorph | StageMorph) {
         this.originalCode = code;
@@ -19,7 +20,8 @@ export class JSThread {
     }
 
     run() {
-        return this.interpreter.run();
+        this.interpreter.run();
+        return this.result;
     }
 
     shouldYield() {
@@ -32,6 +34,13 @@ export class JSThread {
     }
 
     stepUntilYield() {
+        // Do this twice because loops show up in the context on the
+        // way in and the way out.
+        this.stepUntilYieldOnce();
+        this.stepUntilYieldOnce();
+    }
+
+    private stepUntilYieldOnce() {
         do {
             this.step();
         } while (!this.shouldYield());
@@ -54,17 +63,17 @@ export class JSThread {
             for (let key of Object.keys(SpriteMorph.prototype.blocks)) {
                 let block = SpriteMorph.prototype.blocks[key];
                 if (block.type === 'hat') return; // TODO: handle
-                if (block.type === 'reporter') return; // TODO: handle
+                // if (block.type === 'reporter') return; // TODO: handle
 
                 const fKey = key;
                 const wrapper = function() {
                     const args = Array.prototype.slice.call(arguments);
                     if (threads[fKey]) {
                         // console.log('calling threads', fKey, args);
-                        threads[fKey].apply(threads, args);
+                        return threads[fKey].apply(threads, args);
                     } else if (receiver[fKey]) {
                         // console.log('calling sprite', fKey, args);
-                        receiver[fKey].apply(receiver, args);
+                        return receiver[fKey].apply(receiver, args);
                     }
                 };
 
@@ -83,18 +92,14 @@ export class JSThreadManager {
     init() {
         const threadManager = extend(ThreadManager.prototype);
         threadManager.step.after(() => {
-            for (let j = 0; j < 2; j++) {
-                // Run everything twice because of the way the interpreter hits
-                // all yield nodes twice
-                for (let i = 0; i < this.threads.length; i++) {
-                    const thread = this.threads[i];
-                    thread.stepUntilYield();
-                    // console.log("One loop");
-                    if (thread.stopped) {
-                        console.log('removing thread', thread.originalCode);
-                        this.threads.splice(i, 1);
-                        i--;
-                    }
+            for (let i = 0; i < this.threads.length; i++) {
+                const thread = this.threads[i];
+                thread.stepUntilYield();
+                // console.log("One loop");
+                if (thread.stopped) {
+                    console.log('removing thread', thread.originalCode);
+                    this.threads.splice(i, 1);
+                    i--;
                 }
             }
         });
