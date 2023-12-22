@@ -1,8 +1,30 @@
 import * as Interpreter from 'js-interpreter';
 import { OverrideRegistry, Snap } from 'sef';
 import { extend } from 'sef/src/extend/OverrideRegistry';
-import { SpriteMorph, StageMorph, ThreadManager } from 'sef/src/snap/Snap';
+import { List, SpriteMorph, StageMorph, ThreadManager } from 'sef/src/snap/Snap';
 
+function convertSnapObject(obj, interpreter: Interpreter) {
+    if (obj instanceof List) {
+        console.log('converting list', obj);
+        return interpreter.nativeToPseudo(obj.contents.map(convertSnapObject));
+    }
+    return obj;
+}
+
+function convertInterpreterObject(obj, interpreter: Interpreter) {
+    if (obj instanceof Interpreter.Object) {
+        console.log('converting object', obj);
+        obj = interpreter.pseudoToNative(obj);
+    }
+    return convertObjectToSnap(obj);
+}
+
+function convertObjectToSnap(obj) {
+    if (obj instanceof Array) {
+        return new List(obj.map(convertObjectToSnap));
+    }
+    return obj;
+}
 
 export class JSThread { 
     
@@ -11,7 +33,7 @@ export class JSThread {
     receiver: SpriteMorph | StageMorph;
     get stopped() { return this.interpreter.getStatus() == Interpreter.Status.DONE; }
     lastRunNode;
-    get result() { return this.interpreter.value; }
+    get result() { return convertInterpreterObject(this.interpreter.value, this.interpreter); }
 
     constructor(code: string, receiver: SpriteMorph | StageMorph) {
         this.originalCode = code;
@@ -62,7 +84,7 @@ export class JSThread {
             const threads = Snap.stage.threads;
             for (let key of Object.keys(SpriteMorph.prototype.blocks)) {
                 let block = SpriteMorph.prototype.blocks[key];
-                if (block.type === 'hat') return; // TODO: handle
+                if (block.type === 'hat') continue; // TODO: handle
                 // if (block.type === 'reporter') return; // TODO: handle
 
                 const fKey = key;
@@ -70,15 +92,27 @@ export class JSThread {
                     const args = Array.prototype.slice.call(arguments);
                     if (threads[fKey]) {
                         // console.log('calling threads', fKey, args);
-                        return threads[fKey].apply(threads, args);
+                        return convertSnapObject(threads[fKey].apply(threads, args), interpreter);
                     } else if (receiver[fKey]) {
                         // console.log('calling sprite', fKey, args);
-                        return receiver[fKey].apply(receiver, args);
+                        return convertSnapObject(receiver[fKey].apply(receiver, args), interpreter);
                     }
                 };
 
                 interpreter.setProperty(scope, key, interpreter.createNativeFunction(wrapper));
+            }
 
+            const globals = Snap.globalVariables;
+            console.log("!", Object.keys(globals.vars));
+            for (let key of Object.keys(globals.vars)) {
+                console.log('setting global', key);
+                interpreter.setProperty(scope, key, Interpreter.VALUE_IN_DESCRIPTOR, {
+                    get: interpreter.createNativeFunction(() => convertSnapObject(Snap.IDE.getVar(key), interpreter)),
+                    set: interpreter.createNativeFunction(function(value) { 
+                        Snap.IDE.setVar(key, convertInterpreterObject(value, interpreter));
+                    }),
+                });
+                console.log('setting global', key);
             }
         };
     }

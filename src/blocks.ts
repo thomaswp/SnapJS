@@ -10,6 +10,7 @@ export function createBlocks(blockFactory: Blocks.BlockFactory) {
         }
         const jsThread = this.context.jsThread as JSThread;
         console.log('stepping');
+        // TODO: Wait based on the flashTime
         jsThread.stepUntilYield();
         if (jsThread.stopped) {
             this.context.jsThread = null;
